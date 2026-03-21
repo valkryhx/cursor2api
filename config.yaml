@@ -205,3 +205,5 @@ logging:
 #         },
 #       }
 #     }
+
+# http://localhost:3010/v1/models 查看可用模型 anthropic/claude-sonnet-4.6-thinking（慢） anthropic/claude-sonnet-4.6 （快）
