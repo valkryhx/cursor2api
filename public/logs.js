@@ -62,7 +62,7 @@ function connectSSE(){
 
 // ===== Stats =====
 function updStats(){fetch(authQ('/api/stats')).then(r=>r.json()).then(applyStats).catch(()=>{})}
-function applyStats(s){document.getElementById('sT').textContent=s.totalRequests;document.getElementById('sS').textContent=s.successCount;document.getElementById('sE').textContent=s.errorCount;document.getElementById('sA').textContent=s.avgResponseTime||'-';document.getElementById('sF').textContent=s.avgTTFT||'-'}
+function applyStats(s){document.getElementById('sT').textContent=s.totalRequests;document.getElementById('sS').textContent=s.successCount;document.getElementById('sD').textContent=s.degradedCount||0;document.getElementById('sE').textContent=s.errorCount;document.getElementById('sA').textContent=s.avgResponseTime||'-';document.getElementById('sF').textContent=s.avgTTFT||'-'}
 
 // ===== Time Filter =====
 function getTimeCutoff(){
@@ -81,13 +81,13 @@ function mS(r,q){
 }
 function updCnt(){
   const q=sq.toLowerCase();const cut=getTimeCutoff();
-  let a=0,s=0,e=0,p=0,i=0;
+  let a=0,s=0,d=0,e=0,p=0,i=0;
   reqs.forEach(r=>{
     if(cut&&r.startTime<cut)return;
     if(q&&!mS(r,q))return;
-    a++;if(r.status==='success')s++;else if(r.status==='error')e++;else if(r.status==='processing')p++;else if(r.status==='intercepted')i++;
+    a++;if(r.status==='success')s++;else if(r.status==='degraded')d++;else if(r.status==='error')e++;else if(r.status==='processing')p++;else if(r.status==='intercepted')i++;
   });
-  document.getElementById('cA').textContent=a;document.getElementById('cS').textContent=s;document.getElementById('cE').textContent=e;document.getElementById('cP').textContent=p;document.getElementById('cI').textContent=i;
+  document.getElementById('cA').textContent=a;document.getElementById('cS').textContent=s;document.getElementById('cD').textContent=d;document.getElementById('cE').textContent=e;document.getElementById('cP').textContent=p;document.getElementById('cI').textContent=i;
 }
 function fR(f,btn){cFil=f;document.querySelectorAll('#fbar .fb').forEach(b=>b.classList.remove('a'));btn.classList.add('a');renderRL()}
 
@@ -127,7 +127,7 @@ function renderRL(){
     const dateStr=fmtDate(r.startTime);
     let bd='';if(r.stream)bd+='<span class="bg str">Stream</span>';if(r.hasTools)bd+='<span class="bg tls">T:'+r.toolCount+'</span>';
     if(r.retryCount>0)bd+='<span class="bg rtr">R:'+r.retryCount+'</span>';if(r.continuationCount>0)bd+='<span class="bg cnt">C:'+r.continuationCount+'</span>';
-    if(r.status==='error')bd+='<span class="bg err">ERR</span>';if(r.status==='intercepted')bd+='<span class="bg icp">INTERCEPT</span>';
+    if(r.status==='degraded')bd+='<span class="bg dgd">DEGRADED</span>';if(r.status==='error')bd+='<span class="bg err">ERR</span>';if(r.status==='intercepted')bd+='<span class="bg icp">INTERCEPT</span>';
     const fm=r.apiFormat||'anthropic';
     return '<div class="ri'+(ac?' a':'')+'" data-r="'+r.requestId+'">'
       +'<div class="si-dot '+r.status+'"></div>'
@@ -170,9 +170,13 @@ function desel(){
 function renderSCard(s){
   const c=document.getElementById('scard');c.style.display='block';
   const dur=s.endTime?((s.endTime-s.startTime)/1000).toFixed(2)+'s':'进行中...';
-  const sc={processing:'var(--yellow)',success:'var(--green)',error:'var(--red)',intercepted:'var(--pink)'}[s.status]||'var(--t3)';
+  const sc={processing:'var(--yellow)',success:'var(--green)',degraded:'var(--orange)',error:'var(--red)',intercepted:'var(--pink)'}[s.status]||'var(--t3)';
   const items=[['状态','<span style="color:'+sc+'">'+s.status.toUpperCase()+'</span>'],['耗时',dur],['模型',escH(s.model)],['格式',(s.apiFormat||'anthropic').toUpperCase()],['消息数',s.messageCount],['响应字数',fmtN(s.responseChars)],['TTFT',s.ttft?s.ttft+'ms':'-'],['API耗时',s.cursorApiTime?s.cursorApiTime+'ms':'-'],['停止原因',s.stopReason||'-'],['重试',s.retryCount],['续写',s.continuationCount],['工具调用',s.toolCallsDetected]];
   if(s.thinkingChars>0)items.push(['Thinking',fmtN(s.thinkingChars)+' chars']);
+  if(s.inputTokens)items.push(['↑ Cursor tokens',fmtN(s.inputTokens)]);
+  if(s.outputTokens)items.push(['↓ Cursor tokens',fmtN(s.outputTokens)]);
+  if(s.statusReason)items.push(['降级原因',escH(s.statusReason)]);
+  if(s.issueTags&&s.issueTags.length)items.push(['问题标签',escH(s.issueTags.join(', '))]);
   if(s.error)items.push(['错误','<span style="color:var(--red)">'+escH(s.error)+'</span>']);
   document.getElementById('sgrid').innerHTML=items.map(([l,v])=>'<div class="si2"><span class="l">'+l+'</span><span class="v">'+v+'</span></div>').join('');
   renderPTL(s);
@@ -247,13 +251,15 @@ function renderPromptsTab(tc){
     const firstOrigUser=curPayload.messages?.find(m=>m.role==='user');
     const toolInstructionChars=firstCursorMsg&&firstOrigUser?Math.max(0,firstCursorMsg.contentLength-(firstOrigUser?.contentLength||0)):0;
     h+='<div class="content-section"><div class="cs-title">🔄 转换摘要</div>';
-    h+='<div class="sgrid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0">';
+    h+='<div class="sgrid" style="grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0">';
     h+='<div class="si2"><span class="l">原始工具数</span><span class="v">'+origToolCount+'</span></div>';
     h+='<div class="si2"><span class="l">Cursor 工具数</span><span class="v" style="color:var(--green)">0 <span style="font-size:10px;color:var(--t2)">(嵌入消息)</span></span></div>';
-    h+='<div class="si2"><span class="l">工具指令占用</span><span class="v">'+(toolInstructionChars>0?fmtN(toolInstructionChars)+' chars':origToolCount>0?'嵌入第1条消息':'N/A')+'</span></div>';
+    h+='<div class="si2"><span class="l">总上下文</span><span class="v">'+(cursorTotalChars>0?fmtN(cursorTotalChars)+' chars':'—')+'</span></div>';
+    h+='<div class="si2"><span class="l">↑ Cursor 输入 tokens</span><span class="v" style="color:var(--blue)">'+(s.inputTokens?fmtN(s.inputTokens):'—')+'</span></div>';
     h+='<div class="si2"><span class="l">原始消息数</span><span class="v">'+origMsgCount+'</span></div>';
     h+='<div class="si2"><span class="l">Cursor 消息数</span><span class="v" style="color:var(--green)">'+cursorMsgCount+'</span></div>';
-    h+='<div class="si2"><span class="l">总上下文大小</span><span class="v">'+(cursorTotalChars>0?fmtN(cursorTotalChars)+' chars':'—')+'</span></div>';
+    h+='<div class="si2"><span class="l">工具指令占用</span><span class="v">'+(toolInstructionChars>0?fmtN(toolInstructionChars)+' chars':origToolCount>0?'嵌入第1条消息':'N/A')+'</span></div>';
+    h+='<div class="si2"><span class="l">↓ Cursor 输出 tokens</span><span class="v" style="color:var(--green)">'+(s.outputTokens?fmtN(s.outputTokens):'—')+'</span></div>';
     h+='</div>';
     if(origToolCount>0){
       h+='<div style="color:var(--yellow);font-size:12px;padding:6px 10px;background:rgba(234,179,8,0.1);border-radius:6px;margin-top:4px">⚠️ Cursor API 不支持原生 tools 参数。'+origToolCount+' 个工具定义已转换为文本指令，嵌入在 user #1 消息中'+(toolInstructionChars>0?'（约 '+fmtN(toolInstructionChars)+' chars）':'')+'</div>';

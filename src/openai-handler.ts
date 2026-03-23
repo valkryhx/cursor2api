@@ -892,6 +892,11 @@ async function handleOpenAIStream(
             if (split.startedWithThinking && split.complete) {
                 hybridThinkingContent = split.thinkingContent;
                 pushToStreamer(split.remainder);
+            } else if (split.startedWithThinking && !split.complete) {
+                // ★ thinking 未闭合（输出被截断在 thinking 阶段）
+                // 提取部分 thinking 内容，不 push 到正文流，避免泄漏
+                hybridThinkingContent = split.thinkingContent;
+                // remainder 为空，不 push 任何正文内容
             } else {
                 pushToStreamer(hybridLeadingBuffer);
             }
@@ -1134,7 +1139,7 @@ async function handleOpenAINonStream(
     log: RequestLogger,
 ): Promise<void> {
     let activeCursorReq = cursorReq;
-    let fullText = await sendCursorRequestFull(activeCursorReq);
+    let fullText = (await sendCursorRequestFull(activeCursorReq)).text;
     const hasTools = (body.tools?.length ?? 0) > 0;
 
     // 日志记录在详细日志中
@@ -1162,7 +1167,7 @@ async function handleOpenAINonStream(
             const retryBody = buildRetryRequest(anthropicReq, attempt);
             const retryCursorReq = await convertToCursorRequest(retryBody);
             activeCursorReq = retryCursorReq;
-            fullText = await sendCursorRequestFull(activeCursorReq);
+            fullText = (await sendCursorRequestFull(activeCursorReq)).text;
             // 重试响应也需要先剥离 thinking
             if (hasLeadingThinking(fullText)) {
                 fullText = extractThinking(fullText).strippedText;
@@ -1775,7 +1780,7 @@ async function handleResponsesNonStream(
     log: RequestLogger,
 ): Promise<void> {
     let activeCursorReq = cursorReq;
-    let fullText = await sendCursorRequestFull(activeCursorReq);
+    let fullText = (await sendCursorRequestFull(activeCursorReq)).text;
     const hasTools = (anthropicReq.tools?.length ?? 0) > 0;
 
     // Thinking 提取
@@ -1790,7 +1795,7 @@ async function handleResponsesNonStream(
             const retryBody = buildRetryRequest(anthropicReq, attempt);
             const retryCursorReq = await convertToCursorRequest(retryBody);
             activeCursorReq = retryCursorReq;
-            fullText = await sendCursorRequestFull(activeCursorReq);
+            fullText = (await sendCursorRequestFull(activeCursorReq)).text;
             if (hasLeadingThinking(fullText)) {
                 fullText = extractThinking(fullText).strippedText;
             }

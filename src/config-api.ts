@@ -14,6 +14,7 @@ export function apiGetConfig(_req: Request, res: Response): void {
         timeout: cfg.timeout,
         max_auto_continue: cfg.maxAutoContinue,
         max_history_messages: cfg.maxHistoryMessages,
+        max_history_tokens: cfg.maxHistoryTokens,
         thinking: cfg.thinking !== undefined ? { enabled: cfg.thinking.enabled } : null,
         compression: {
             enabled: cfg.compression?.enabled ?? false,
@@ -29,7 +30,7 @@ export function apiGetConfig(_req: Request, res: Response): void {
         },
         sanitize_response: cfg.sanitizeEnabled,
         refusal_patterns: cfg.refusalPatterns ?? [],
-        logging: cfg.logging ?? { file_enabled: false, dir: './logs', max_days: 7, persist_mode: 'summary' },
+        logging: cfg.logging ?? { file_enabled: false, dir: './logs', max_days: 7, persist_mode: 'summary', db_enabled: false, db_path: './logs/cursor2api.db' },
     });
 }
 
@@ -52,6 +53,9 @@ export function apiSaveConfig(req: Request, res: Response): void {
     }
     if (body.max_history_messages !== undefined && typeof body.max_history_messages !== 'number') {
         res.status(400).json({ error: 'max_history_messages must be a number' }); return;
+    }
+    if (body.max_history_tokens !== undefined && typeof body.max_history_tokens !== 'number') {
+        res.status(400).json({ error: 'max_history_tokens must be a number' }); return;
     }
 
     try {
@@ -80,6 +84,10 @@ export function apiSaveConfig(req: Request, res: Response): void {
         if (body.max_history_messages !== undefined && body.max_history_messages !== raw.max_history_messages) {
             changes.push(`max_history_messages: ${raw.max_history_messages ?? '(unset)'} → ${body.max_history_messages}`);
             raw.max_history_messages = body.max_history_messages;
+        }
+        if (body.max_history_tokens !== undefined && body.max_history_tokens !== raw.max_history_tokens) {
+            changes.push(`max_history_tokens: ${raw.max_history_tokens ?? '(unset)'} → ${body.max_history_tokens}`);
+            raw.max_history_tokens = body.max_history_tokens;
         }
         if (body.thinking !== undefined) {
             const t = body.thinking as { enabled: boolean | null } | null;

@@ -25,8 +25,11 @@
               <Field label="max_auto_continue" desc="截断时自动续写的最大次数。默认 0（禁用），推荐由客户端（如 Claude Code）自行处理，体验更好；设为 1~3 可启用 proxy 内部续写">
                 <input v-model.number="draft.max_auto_continue" type="number" min="0" class="inp" />
               </Field>
-              <Field label="max_history_messages" desc="输入消息条数上限，超出时删除最早的消息（保留工具 few-shot 示例）。防止超长对话导致请求体积过大、响应变慢。默认 -1（不限制）">
+              <Field label="max_history_messages" desc="按条数裁剪历史（保留工具 few-shot 示例）。注意：条数无法反映实际 token 体积，建议改用下方的 max_history_tokens。-1 不限制">
                 <input v-model.number="draft.max_history_messages" type="number" min="-1" class="inp" />
+              </Field>
+              <Field label="max_history_tokens" desc="按 token 数裁剪历史（推荐）。从最早消息整条删除，有助于减少超出 Cursor 上下文的概率。代码自动补偿 Cursor 后端开销（1,300 基础 + 工具 tokenizer 差异，动态计算），默认 150000，参考值 130000~170000。-1 不限制">
+                <input v-model.number="draft.max_history_tokens" type="number" min="-1" class="inp" />
               </Field>
             </Group>
 
@@ -34,8 +37,8 @@
             <Group title="功能">
               <Field label="thinking.enabled" desc="最高优先级。跟随客户端 = 不干预（推荐）；强制关闭 = 即使客户端请求也不启用；强制开启 = 即使客户端未请求也注入">
                 <SegSelect
-                  :modelValue="draft.thinking === null ? 'auto' : draft.thinking.enabled ? 'on' : 'off'"
-                  @update:modelValue="v => draft.thinking = v === 'auto' ? null : { enabled: v === 'on' }"
+                  :modelValue="draft!.thinking === null ? 'auto' : draft!.thinking.enabled ? 'on' : 'off'"
+                  @update:modelValue="v => draft!.thinking = v === 'auto' ? null : { enabled: v === 'on' }"
                   :options="[
                     { value: 'auto', label: '跟随客户端' },
                     { value: 'off', label: '强制关闭' },
@@ -91,7 +94,15 @@
 
             <!-- 日志 -->
             <Group title="日志持久化（logging）">
-              <Field label="logging.file_enabled" desc="开启后日志会写入文件，重启后自动加载历史记录。默认关闭">
+              <Field label="logging.db_enabled" desc="SQLite 持久化（推荐）。启动时仅加载摘要，payload 按需查询，彻底避免大文件 OOM；Vue UI 支持重启后翻页查看完整历史">
+                <Toggle v-model="draft.logging.db_enabled" />
+              </Field>
+              <template v-if="draft.logging.db_enabled">
+                <Field label="logging.db_path" desc="SQLite 文件路径，默认 ./logs/cursor2api.db。Docker 部署请确保 logs 目录已挂载">
+                  <input v-model="draft.logging.db_path" type="text" class="inp inp-wide" />
+                </Field>
+              </template>
+              <Field label="logging.file_enabled" desc="JSONL 文件持久化。日志量大时（>100MB/天）建议改用 SQLite 方式">
                 <Toggle v-model="draft.logging.file_enabled" />
               </Field>
               <template v-if="draft.logging.file_enabled">
@@ -101,7 +112,7 @@
                 <Field label="logging.max_days" desc="超出天数的日志文件自动清理，默认 7 天">
                   <input v-model.number="draft.logging.max_days" type="number" min="1" class="inp" />
                 </Field>
-                <Field label="logging.persist_mode" desc="summary=仅保留问答摘要与少量元数据（默认）；compact=精简调试信息（保留更多排障细节）；full=完整持久化">
+                <Field label="logging.persist_mode" desc="summary=仅保留问答摘要与少量元数据（默认）；compact=精简调试信息（保留更多排障细节）；full=完整持久化（体积最大，慎用）">
                   <SegSelect v-model="draft.logging.persist_mode" :options="[
                     { value: 'summary', label: 'summary' },
                     { value: 'compact', label: 'compact' },
@@ -395,6 +406,11 @@ input[type="text"].inp-wide { width: 200px; }
 .btn-save:not(:disabled):hover { filter: brightness(1.1); }
 
 /* 保存提示 */
+.restart-notice {
+  font-size: 11px; padding: 5px 8px; margin-bottom: 4px;
+  border-radius: 6px; color: var(--yellow);
+  background: color-mix(in srgb, var(--yellow) 10%, transparent);
+}
 .save-msg {
   font-size: 11px; padding: 5px 8px;
   border-radius: 6px; word-break: break-all;

@@ -37,24 +37,29 @@ export interface RequestSummary {
   hasTools: boolean;
   toolCount: number;
   messageCount: number;
-  status: 'processing' | 'success' | 'error' | 'intercepted';
+  status: 'processing' | 'success' | 'degraded' | 'error' | 'intercepted';
   responseChars: number;
   retryCount: number;
   continuationCount: number;
   stopReason?: string;
   error?: string;
+  statusReason?: string;
+  issueTags?: string[];
   toolCallsDetected: number;
   ttft?: number;
   cursorApiTime?: number;
   phaseTimings: PhaseTiming[];
   thinkingChars: number;
   systemPromptLength: number;
+  inputTokens?: number;
+  outputTokens?: number;
   title?: string;
 }
 
 export interface Stats {
   totalRequests: number;
   successCount: number;
+  degradedCount: number;
   errorCount: number;
   avgResponseTime: number;
   avgTTFT: number;
@@ -66,12 +71,13 @@ export interface HotConfig {
   timeout: number;
   max_auto_continue: number;
   max_history_messages: number;
+  max_history_tokens: number;
   thinking: { enabled: boolean } | null;
   compression: { enabled: boolean; level: 1 | 2 | 3; keep_recent: number; early_msg_max_chars: number };
   tools: { schema_mode: 'compact' | 'full' | 'names_only'; description_max_length: number; passthrough?: boolean; disabled?: boolean };
   sanitize_response: boolean;
   refusal_patterns: string[];
-  logging: { file_enabled: boolean; dir: string; max_days: number; persist_mode: 'compact' | 'full' | 'summary' };
+  logging: { file_enabled: boolean; dir: string; max_days: number; persist_mode: 'compact' | 'full' | 'summary'; db_enabled: boolean; db_path: string };
 }
 
 export interface SaveConfigResult {
