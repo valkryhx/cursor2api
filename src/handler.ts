@@ -86,11 +86,9 @@ export function listModels(_req: Request, res: Response): void {
     res.json({
         object: 'list',
         data: [
-            { id: model, object: 'model', created: now, owned_by: 'anthropic' },
-            // Cursor IDE 推荐使用以下 Claude 模型名（避免走 /v1/responses 格式）
-            { id: 'claude-sonnet-4-5-20250929', object: 'model', created: now, owned_by: 'anthropic' },
-            { id: 'claude-sonnet-4-20250514', object: 'model', created: now, owned_by: 'anthropic' },
-            { id: 'claude-3-5-sonnet-20241022', object: 'model', created: now, owned_by: 'anthropic' },
+            { id: model, object: 'model', created: now, owned_by: 'google' },
+            // Cursor API 当前仅支持 google/gemini-3-flash (2026-04 更新)
+            { id: 'google/gemini-3-flash', object: 'model', created: now, owned_by: 'google' },
         ],
     });
 }

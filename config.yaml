@@ -24,8 +24,8 @@ auth_tokens:
 # 💡 国内可直连 Cursor API，通常不需要配置全局代理
 # proxy: "http://127.0.0.1:7890"
 
-# Cursor 使用的模型 anthropic/claude-sonnet-4.6 更快 
-cursor_model: "anthropic/claude-sonnet-4.6-thinking"
+# Cursor 使用的模型 google/gemini-3-flash (2026-04 更新，Cursor API 仅支持此模型)
+cursor_model: "google/gemini-3-flash"
 
 # ==================== 自动续写配置 ====================
 # 当模型输出被截断时，自动发起续写请求的最大次数
@@ -40,7 +40,7 @@ max_auto_continue: 10
 # 设为 -1 不限制消息条数
 # 环境变量: MAX_HISTORY_MESSAGES=100
 max_history_messages: -1
-
+max_history_tokens: 150000
 # ==================== Thinking 开关（最高优先级） ====================
 # 控制是否向 Cursor 发送 thinking 请求，优先级高于客户端传入的 thinking 参数
 # 设为 true: 强制启用 thinking（即使客户端没请求也注入）
@@ -56,7 +56,7 @@ thinking:
 compression:
   # 是否启用压缩（true/false），关闭后所有消息原样保留
   # 环境变量: COMPRESSION_ENABLED=true|false
-  enabled: false
+  enabled: true
 
   # 压缩级别: 1=轻度(默认), 2=中等, 3=激进
   # 环境变量: COMPRESSION_LEVEL=1|2|3
@@ -64,7 +64,7 @@ compression:
   #   1（轻度）: 保留最近 10 条消息，早期消息保留 4000 字符，适合日常使用（默认）
   #   2（中等）: 保留最近 6 条消息，早期消息保留 2000 字符，适合中长对话
   #   3（激进）: 保留最近 4 条消息，早期消息保留 1000 字符，适合超长对话/大工具集
-  level: 1
+  level: 2
 
   # 以下为高级选项，设置后会覆盖 level 的预设值
   # 保留最近 N 条消息不压缩（数字越大保留越多上下文）
@@ -113,7 +113,7 @@ tools:
   #   false: [默认] 使用标准模式（buildToolInstructions + 多类别 few-shot 注入）
   #          Claude Code 推荐此模式，兼容性和工具调用覆盖率更好
   # 环境变量: TOOLS_PASSTHROUGH=true|false
-  # passthrough: true
+  passthrough: false
 
   # ★ 禁用模式（极致省上下文）
   #   true:  完全不注入工具定义和 few-shot 示例，节省大量上下文空间
@@ -121,7 +121,7 @@ tools:
   #          响应中的 ```json action``` 块仍会被正常解析
   #   false: [默认] 正常注入工具定义
   # 环境变量: TOOLS_DISABLED=true|false
-  # disabled: true
+  disabled: false
 
 # ==================== 响应内容清洗（可选，默认关闭） ====================
 # 开启后，会将响应中 Cursor 相关的身份引用替换为 Claude
